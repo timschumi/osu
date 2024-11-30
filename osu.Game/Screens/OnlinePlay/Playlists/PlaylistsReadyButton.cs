@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -11,7 +12,9 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Online.Rooms;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.OnlinePlay.Components;
+using osu.Game.Utils;
 
 namespace osu.Game.Screens.OnlinePlay.Playlists
 {
@@ -28,6 +31,9 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
 
         [Resolved]
         private IBindable<WorkingBeatmap> gameBeatmap { get; set; }
+
+        [Resolved]
+        private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
         public PlaylistsReadyButton()
         {
@@ -61,14 +67,14 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
         {
             base.Update();
 
-            Enabled.Value = hasRemainingAttempts && enoughTimeLeft;
+            Enabled.Value = hasRemainingAttempts && enoughTimeLeft();
         }
 
         public override LocalisableString TooltipText
         {
             get
             {
-                if (!enoughTimeLeft)
+                if (!enoughTimeLeft())
                     return "No time left!";
 
                 if (!hasRemainingAttempts)
@@ -78,8 +84,15 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
             }
         }
 
-        private bool enoughTimeLeft =>
+        private bool enoughTimeLeft()
+        {
+            // this doesn't consider mods which apply variable rates, yet.
+            double rate = ModUtils.CalculateRateWithMods(mods.Value);
+
+            double hitLength = Math.Round(gameBeatmap.Value.Track.Length / rate);
+
             // This should probably consider the length of the currently selected item, rather than a constant 30 seconds.
-            endDate.Value != null && DateTimeOffset.UtcNow.AddSeconds(30).AddMilliseconds(gameBeatmap.Value.Track.Length) < endDate.Value;
+            return endDate.Value != null && DateTimeOffset.UtcNow.AddSeconds(30 + 9 * 60 * 60).AddMilliseconds(hitLength) < endDate.Value;
+        }
     }
 }
